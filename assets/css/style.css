@@ -1056,6 +1056,14 @@ body {
     print-color-adjust: exact;
   }
 
+  /* حفظ كل الألوان والخلفيات في ملف الـ PDF — كل العناصر */
+  *,
+  *::before,
+  *::after {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   .skip-link,
   .deck-footer {
     display: none !important;
@@ -1063,8 +1071,17 @@ body {
 
   /* في الطباعة يُلغى اللوح المقيس وتُطبع كل شريحة بخط 28px حقيقيًا */
   .deck {
+    /* تُلغى موضع اللوح المقيس: بدون هذا تبقى absolute + left/top 50%
+       فتقع شريحة الطباعة الأولى في منتصف الصفحة وتتجاوز مساحتها */
+    position: relative;
+    left: auto;
+    top: auto;
     width: auto;
     height: auto;
+    /* الحدّان الشاشيان (100%) لا يقصّان اللوح في الطباعة:
+       اللوح يمتدّ بارتفاع الشرائح الثماني كاملة */
+    max-width: none;
+    max-height: none;
     overflow: visible;
     background: #fff;
     transform: none;
@@ -1129,9 +1146,20 @@ body {
     max-width: none;
   }
 
+  /* المعرض: الصور كاملة بلا قصّ ولا تلاشٍ، ومرتّبة في شبكة
+     تتّسع داخل الشريحة فلا تتجاوز عرض الصفحة */
+  .showcase__viewport {
+    overflow: visible;
+    -webkit-mask: none;
+    mask: none;
+  }
+
   .showcase__strip {
     animation: none !important;
     transform: none !important;
+    display: grid;
+    grid-template-columns: repeat(8, minmax(0, 1fr));
+    width: 100%;
     gap: 10px;
   }
 
@@ -1139,8 +1167,13 @@ body {
     display: none;
   }
 
+  .showcase__item {
+    min-width: 0;
+  }
+
   .showcase__item img {
-    height: 26mm;
+    width: 100%;
+    height: auto;
   }
 
   /* المشاريع: عمود واحد كامل العرض — صورة تطفو بجانب النص
