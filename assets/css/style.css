@@ -739,19 +739,35 @@ body {
 .closing__mail {
   color: var(--ink);
   text-decoration: none;
-  border-bottom: 1px solid var(--line);
+  /* الإيميل لاتيني داخل صفحة عربية: سطر واحد لا ينكسر أبدًا
+     (لا يغيّر حجم الخط ولا يعتمد على أي clamp) */
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  /* لا خط تحتي ظاهر، ويظهر لونه فقط عند التحويم
+     (لون شفاف يمنع أي قفز 1px عند التحويم) */
+  border-bottom: 1px solid transparent;
   padding-bottom: 0.2rem;
-  /* لا يتجاوز الشريحة على الشاشات الضيقة مع بقاء الحد الأدنى 28px */
-  overflow-wrap: anywhere;
   transition: color 0.2s ease, border-color 0.2s ease;
 }
 
 .closing__mail:hover {
   color: var(--olive-deep);
-  border-color: var(--olive);
+  border-bottom-color: var(--olive);
+}
+
+/* شاشات أضيق من 430px: يعود الإيميل إلى التفاف طبيعي
+   حتى لا يُقصّ من أي جهة. لا تغيير في حجم الخط أو أي خاصية طباعية. */
+@media (max-width: 430px) {
+  .closing__mail {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }
 
 .closing__name {
+  /* يلغي هامش الـ <p> الافتراضي 28px حتى تتساوى فجوات عنصر الختام */
+  margin: 0;
   color: var(--ink-muted);
 }
 
@@ -1281,6 +1297,11 @@ body {
   /* الختام */
   .closing__cta {
     padding: 0.7rem 1.6rem;
+  }
+
+  /* زر تحميل ملف PDF لا يظهر في الطباعة */
+  .closing__cta--pdf {
+    display: none;
   }
 
   .btn {
