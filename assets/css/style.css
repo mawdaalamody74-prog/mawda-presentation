@@ -1,0 +1,1304 @@
+/* =========================================================
+   مودة العمودي — عرض تقديمي تفاعلي
+   نظام تصميم: أكاديمي هادئ — مقياس عرض تقديمي أفقي 16:9
+   المقاس المستهدف: 1920×1080 ويتكيّف مع 1366×768
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   1) إعادة الضبط والمتغيرات
+   ---------------------------------------------------------
+   المقياس: 1rem = 10 وحدة من لوح التصميم.
+   حجم جذر الصفحة يُشتق من النافذة فيُقاس اللوح 16:9 تلقائيًا:
+     العرض المقيد  = min(100vw / 192, 100vh / 108)
+   فاللوح = 192rem × 108rem = أكبر مستطيل 16:9 يسع النافذة تمامًا.
+   لا يعتمد هذا على الجافاسكربت إطلاقًا، ولا يمكن أن يتجاوز اللوح النافذة.
+--------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* احتياطي للمتصفحات القديمة، ثم المعادلة الأدق */
+  font-size: 0.520833vw;
+  font-size: min(100vw / 192, 100vh / 108);
+  -webkit-text-size-adjust: 100%;
+}
+
+/* طبقة حماية — لا شيء في الصفحة يتجاوز عرض الشاشة.
+   الاحتواء الحقيقي يجري داخل اللوح أعلاه (كل عنصر مقيّد بصندوق
+   محتواه وشبكاته minmax(0,…))، وهذا القانون يمنع أي تجاوز خارجي. */
+html,
+body {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+html {
+  /* شريط تمرير عمودي يغيّر عرض 100vw، فيكسر احتواء اللوح، فلا يُسمح به */
+  overflow-y: hidden;
+}
+
+:root {
+  /* الهوية */
+  --paper: #F7F5EE;
+  --paper-raised: #FFFEFA;
+  --olive: #667257;
+  --olive-deep: #46513D;
+  --olive-soft: #E7E9DE;
+  --ink: #343832;
+  --ink-muted: #73766D;
+  --gold: #C9AE70;
+  --line: #DDD9CD;
+
+  /* لوح العرض: نسبة 16:9 ثابتة يُقاس بالكامل ليظهر كاملًا في أي نافذة */
+  --canvas-w: 192rem;   /* 1920 */
+  --canvas-h: 108rem;   /* 1080 */
+
+  /* المقياس الطباعي — يتبع عرض اللوح 16:9 لكنه لا ينزل أبدًا تحت 28px
+     (شرط الدكتور). --sheet-w = عرض اللوح الفعلي =
+     أصغر من عرض النافذة أو من ارتفاعها × 16/9، فتُحترم النسبة 16:9
+     وتبقى الحدود الدنيا محفوظة على أي شاشة. القيم العليا = تصميم 1920. */
+  --sheet-w: min(100vw, 177.7778vh);
+  --fs-body: clamp(28px, calc(var(--sheet-w) / 64),       30px);   /* 30 */
+  --fs-h3:   clamp(30px, calc(var(--sheet-w) / 60),       32px);   /* 32 */
+  --fs-h2:   clamp(34px, calc(var(--sheet-w) / 46.8293),  41px);   /* 41 */
+  --fs-h1:   clamp(44px, calc(var(--sheet-w) / 36.2264),  53px);   /* 53 */
+  --lh-body: 1.45;
+  --lh-head: 1.1;
+
+  /* الإيقاع */
+  --sp-1: 0.4rem;
+  --sp-2: 0.8rem;
+  --sp-3: 1.2rem;
+  --sp-4: 1.6rem;
+  --sp-5: 2.4rem;
+  --sp-6: 3.2rem;
+  --sp-7: 4.8rem;
+  --slide-pad: 3.2rem;
+  --col-gap: 3.6rem;
+  /* ارتفاع شريط التنقل السفلي — تحجزه الشريحة من الأسفل */
+  --bar-h: 5.8rem;
+
+  /* الصور */
+  --radius: 1.2rem;
+  --shadow-img: 0 1.2rem 2.8rem rgba(70, 81, 61, 0.1);
+  --shadow-btn: 0 0.4rem 1.2rem rgba(70, 81, 61, 0.14);
+}
+
+body {
+  margin: 0;
+  /* إطار العرض: يملأ نافذة المتصفّح — بلا تمرير أفقي أبدًا */
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #EDEAE0;
+  color: var(--ink);
+  font-family: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, Arial, sans-serif;
+  font-size: var(--fs-body);
+  font-weight: 400;
+  line-height: var(--lh-body);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------------------------------------------------------
+   2) أدوات مساعدة
+--------------------------------------------------------- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 60;
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: var(--olive-deep);
+  color: #fff;
+  font-size: 16px;
+  text-decoration: none;
+  transform: translateY(-180%);
+  transition: transform 0.2s ease;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+:focus-visible {
+  outline: 3px solid var(--olive);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+/* ---------------------------------------------------------
+   3) هيكل العرض — شريحة واحدة تملأ الشاشة
+--------------------------------------------------------- */
+/* لوح العرض 16:9 — يساوي بالضبط أكبر مستطيل 16:9 يسع النافذة،
+   فيظهر كاملًا دائمًا بلا أي تمرير. لا اعتماد على الجافاسكربت. */
+.deck {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--canvas-w);
+  height: var(--canvas-h);
+  /* ضمان أخير: اللوح لا يتجاوز النافذة مهما كان المتصفّح */
+  max-width: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  transform: translate(-50%, -50%);
+}
+
+.slide {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: var(--slide-pad);
+  /* تحجز مساحة شريط التنقل حتى لا يغطي المحتوى */
+  padding-bottom: calc(var(--slide-pad) + var(--bar-h));
+  background: var(--paper);
+  /* الأمان: على نوافذ قصيرة يُسمح بالتمرير الرأسي فقط حتى لا يُقصّ محتوى،
+     والتمرير الأفقي محجوب هنا منعاً لخطوة إضافية قد تتجاوز النافذة.
+     الظل يقع داخل حشو الشريحة فلا يُقطع. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(0.6rem);
+  transition: opacity 0.42s ease, transform 0.42s ease, visibility 0s linear 0.42s;
+}
+
+.slide.is-active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  transition: opacity 0.42s ease, transform 0.42s ease, visibility 0s;
+}
+
+/* الحالة الأوليّة قبل التفاعل: بلا انتقال حتى لا تتداخل الشرائح */
+.deck:not(.is-ready) .slide {
+  transition: none;
+}
+
+.slide__inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  margin-inline: auto;
+}
+
+/* رأس الشريحة — سطر واحد مضغوط */
+.slide__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-2) var(--sp-4);
+  margin-bottom: var(--sp-3);
+  padding-bottom: var(--sp-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.slide__head h2 {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  line-height: var(--lh-head);
+  color: var(--ink);
+}
+
+.slide__tag {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-body);
+  font-weight: 400;
+}
+
+.slide__tag::before {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 0.5em;
+  margin-inline-end: 0.65em;
+  vertical-align: 0.18em;
+  border-radius: 50%;
+  background: var(--tone, var(--gold));
+}
+
+/* ---------------------------------------------------------
+   4) الغلاف
+--------------------------------------------------------- */
+.cover {
+  justify-content: center;
+  gap: 4.8rem;
+}
+
+.cover__head {
+  max-width: 108rem;
+}
+
+.cover__title {
+  margin: 0;
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  line-height: var(--lh-head);
+  color: var(--ink);
+}
+
+.cover__name {
+  margin: var(--sp-5) 0 0;
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  color: var(--olive);
+}
+
+.cover__sub {
+  margin: var(--sp-2) 0 0;
+  color: var(--ink-muted);
+}
+
+/* شريط اللقطات — صور فقط، بلا أسماء ولا وصف */
+.showcase {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  width: 100%;
+}
+
+.showcase__label {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.showcase__viewport {
+  position: relative;
+  direction: ltr;
+  overflow: hidden;
+  border-block: 1px solid var(--line);
+  padding-block: var(--sp-3);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 4%, #000 96%, transparent);
+}
+
+.showcase__strip {
+  display: flex;
+  gap: var(--sp-4);
+  width: max-content;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  animation: showcase-scroll 72s linear infinite;
+}
+
+.showcase__viewport:hover .showcase__strip,
+.showcase__viewport:focus-within .showcase__strip {
+  animation-play-state: paused;
+}
+
+.showcase__item {
+  flex: 0 0 auto;
+}
+
+/* ~18% من ارتفاع اللوح */
+.showcase__item img {
+  display: block;
+  width: auto;
+  height: 19.4rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-raised);
+  box-shadow: 0 0.6rem 1.6rem rgba(70, 81, 61, 0.07);
+}
+
+@keyframes showcase-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(calc(-50% - var(--sp-3))); }
+}
+
+/* ---------------------------------------------------------
+   5) عمودان: مقدمة + نقاط
+--------------------------------------------------------- */
+.split {
+  flex: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: var(--col-gap);
+  align-items: stretch;
+  min-height: 0;
+}
+
+/* عنّي: التصريح والنقاط الثلاث مجموعة واحدة في منتصف الشريحة —
+   لا فراغ بينهما ثم فراغ آخر أسفلهما */
+.slide--about .split {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-content: center;
+  gap: var(--sp-6);
+}
+
+.slide--about .lead {
+  max-width: 62ch;
+  align-self: start;
+  font-size: var(--fs-h3);
+}
+
+.slide--about .list--row {
+  /* بارتفاع محتواها — المجموعة كاملة هي التي تتوسّط */
+  flex: 0 0 auto;
+  align-self: center;
+  align-items: stretch;
+}
+
+.slide--about .list__item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: 5.6rem 4rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+}
+
+.slide--about .list__num {
+  font-size: var(--fs-h2);
+}
+
+.lead {
+  margin: 0;
+  color: var(--ink);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  min-width: 0;
+}
+
+.list__item {
+  display: grid;
+  grid-template-columns: 4.8rem minmax(0, 1fr);
+  gap: var(--sp-1) var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--line);
+}
+
+.list__num {
+  grid-row: 1 / span 2;
+  color: var(--gold);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  line-height: var(--lh-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.list__title {
+  margin: 0;
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  line-height: var(--lh-head);
+  color: var(--ink);
+}
+
+.list__text {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.list--row {
+  flex-direction: row;
+  gap: var(--col-gap);
+  align-items: start;
+}
+
+.list--row .list__item {
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sp-2);
+}
+
+.list--row .list__num {
+  grid-row: auto;
+}
+
+/* ماذا تعلمت؟: النقاط بارتفاعها الطبيعي، ولوحة الموقف تملأ ما تبقّى
+   فلا يبقى فراغ ميت بين العناصر */
+.slide--learn .list--row {
+  flex: 0 0 auto;
+}
+
+.slide--learn .list--row .list__item {
+  align-content: start;
+  padding-block: 2.8rem;
+}
+
+.slide--learn .list__num {
+  font-size: var(--fs-h2);
+}
+
+.slide--learn .moment {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* ---------------------------------------------------------
+   6) شرائح المشاريع — صورة قوية + محتوى واضح
+--------------------------------------------------------- */
+.slide--project {
+  --tone: var(--olive);
+}
+
+.tone-cv        { --tone: var(--olive); }
+.tone-memo      { --tone: #9A6076; }
+.tone-nuqta     { --tone: #2F7D62; }
+.tone-portfolio { --tone: #A9832F; }
+
+.slide--project .slide__head::after {
+  content: "";
+  order: -1;
+  flex: 0 0 auto;
+  width: 0.56rem;
+  height: 2.4rem;
+  align-self: center;
+  border-radius: 999px;
+  background: var(--tone);
+}
+
+/* الصورة أولًا في ترتيب HTML، و--shot-w يحكم عرض عمودها */
+.project {
+  flex: 1;
+  display: grid;
+  gap: var(--col-gap);
+  align-items: stretch;
+  min-height: 0;
+  /* الصف مقيّد بارتفاع الشريحة: الصورة تقصّ لتملأ عمودها */
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(0, var(--shot-w, 0.85fr)) minmax(0, 1fr);
+}
+
+/* النص أولًا بصريًا: الصورة تنتقل للعمود الثاني (يسار) */
+.project--text-first {
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--shot-w, 0.85fr));
+}
+
+.project--text-first .project__shot {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.project--text-first .project__body {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+/* شخصية بصرية خفيفة لكل مشروع عبر حجم الصورة */
+.project--shot-s  { --shot-w: 1.38fr; }
+.project--shot-m  { --shot-w: 1.48fr; }
+.project--shot-l  { --shot-w: 1.43fr; }
+.project--shot-xl { --shot-w: 1.53fr; }
+
+.project__body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.project__shot {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* الصورة والزر مجموعتان في منتصف العمود */
+  justify-content: center;
+  gap: var(--sp-3);
+  margin: 0;
+  min-width: 0;
+  height: 100%;
+}
+
+/* اللقطة كاملة بلا قصّ — ولا تقصر إلا حين يضيق الارتفاع */
+.project__shot img {
+  display: block;
+  flex: 0 0 auto;
+  width: 100%;
+  height: auto;
+  max-height: calc(100% - 7.2rem);
+  object-fit: cover;
+  object-position: top center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  box-shadow: var(--shadow-img);
+}
+
+.project__action {
+  margin: 0;
+  padding-top: 0;
+}
+
+/* الوصف: ثلاثة كتل توزّع نفسها على ارتفاع العمود فلا يبقى فراغ ميت،
+   مع مسافة تنفّس فوق شريط التنقل (تكفي دون دفع زر الزيارة خارج الصندوق) */
+.facts {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin: 0;
+  min-width: 0;
+  padding-bottom: 1.6rem;
+}
+
+.fact {
+  margin: 0;
+}
+
+.fact__label {
+  margin: 0 0 var(--sp-2);
+  color: var(--olive);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.fact__text {
+  margin: 0;
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------
+   7) زر زيارة الموقع
+--------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 1.2rem 3.4rem;
+  border-radius: 999px;
+  background: var(--olive);
+  color: #fff;
+  font-family: inherit;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn:hover {
+  background: var(--olive-deep);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-btn);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.btn__arrow {
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------
+   8) ماذا تعلمت؟
+--------------------------------------------------------- */
+.slide--learn .slide__inner {
+  justify-content: flex-start;
+  gap: var(--sp-6);
+}
+
+/* لوحة تملأ ما تبقّى بعد النقاط — بمحتواها في منتصفها */
+.moment {
+  padding: 4rem 5.6rem;
+  border: 1px solid var(--line);
+  border-inline-start: 0.5rem solid var(--olive);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+}
+
+.moment__title {
+  margin: 0 0 var(--sp-5);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  line-height: var(--lh-head);
+  color: var(--ink);
+}
+
+.moment__cols {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--col-gap);
+}
+
+.moment__label {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--olive);
+}
+
+.moment__text {
+  margin: 0;
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------
+   9) الختام
+--------------------------------------------------------- */
+.closing {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 4.3rem;
+  max-width: 96rem;
+}
+
+.closing__thanks {
+  margin: 0;
+  font-size: var(--fs-h1);
+  font-weight: 700;
+  line-height: var(--lh-head);
+  color: var(--ink);
+}
+
+.closing__rule {
+  display: block;
+  width: 11rem;
+  height: 0.2rem;
+  border-radius: 999px;
+  background: var(--gold);
+}
+
+.closing__cta-wrap {
+  margin: 0;
+}
+
+.closing__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 1.4rem 4.4rem;
+  border: 1px solid var(--olive);
+  border-radius: 999px;
+  color: var(--olive-deep);
+  font-size: var(--fs-h3);
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.closing__cta:hover {
+  background: var(--olive);
+  color: #fff;
+}
+
+.closing__contact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  max-width: 100%;
+}
+
+.closing__contact p {
+  margin: 0;
+}
+
+.closing__label {
+  color: var(--ink-muted);
+}
+
+.closing__mail {
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 0.2rem;
+  /* لا يتجاوز الشريحة على الشاشات الضيقة مع بقاء الحد الأدنى 28px */
+  overflow-wrap: anywhere;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.closing__mail:hover {
+  color: var(--olive-deep);
+  border-color: var(--olive);
+}
+
+.closing__name {
+  color: var(--ink-muted);
+}
+
+/* ---------------------------------------------------------
+   10) شريط التنقل السفلي — أصغر من محتوى الشريحة
+--------------------------------------------------------- */
+.deck-footer {
+  /* داخل اللوح المقيس — ينتمي إلى السلايد فلا يخرج عنه أبدًا */
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  z-index: 30;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+}
+
+/* شريط التقدم: خط رفيع جدًا */
+.progress {
+  height: 0.2rem;
+  background: var(--line);
+}
+
+.progress__bar {
+  display: block;
+  height: 100%;
+  width: 12.5%;
+  background: var(--olive);
+  transition: width 0.42s ease;
+}
+
+.deck-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  padding: 0.8rem var(--slide-pad);
+}
+
+.counter {
+  margin: 0;
+  /* الأرقام والشريحة تُقرأ يسارًا-يمينًا مهما كان اتجاه الصفحة */
+  direction: ltr;
+  unicode-bidi: isolate;
+  white-space: nowrap;
+  color: var(--ink-muted);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+.nav {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.nav__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0.7rem 2.4rem;
+  border: 1px solid var(--olive);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--olive-deep);
+  font-family: inherit;
+  font-size: var(--fs-body);
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.nav__btn:hover:not(:disabled) {
+  background: var(--olive);
+  color: #fff;
+}
+
+.nav__btn:disabled {
+  border-color: var(--line);
+  color: var(--ink-muted);
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.nav__arrow {
+  font-size: 1.1em;
+  line-height: 1;
+}
+
+/* ---------------------------------------------------------
+   11) استجابة — تحت 1024px فقط
+      فوق هذا الحد يبقى لوح 16:9 المقيس (يُقاس بالكامل فلا يتجاوز النافذة)،
+      وتحته يُلغى اللوح ويعود التخطيط سائلًا ويكدّس أعمدته
+--------------------------------------------------------- */
+@media (max-width: 1024px) {
+  /* تحت 1024px يُلغى اللوح المقيس، ويعود rem إلى قيمته المعتادة 16px */
+  html {
+    font-size: 16px;
+  }
+
+  :root {
+    --slide-pad: 20px;
+    --col-gap: 20px;
+    --bar-h: 64px;
+    --radius: 10px;
+    --sp-1: 4px;
+    --sp-2: 8px;
+    --sp-3: 12px;
+    --sp-4: 16px;
+    --sp-5: 20px;
+    --sp-6: 24px;
+    --sp-7: 32px;
+    --fs-body: 28px;
+    --fs-h3: 28px;
+    --fs-h2: 32px;
+    --fs-h1: 38px;
+  }
+
+  /* كل القيم الثابتة داخل اللوح تعود إلى بكسل */
+  .cover { gap: 24px; }
+  .cover__head { max-width: none; }
+  .showcase__item img { height: 96px; }
+  .list__item { grid-template-columns: 40px minmax(0, 1fr); }
+  .slide--about .list__item { padding: 24px 20px; }
+  .slide--project .slide__head::after { width: 4px; height: 18px; }
+  .facts { padding-bottom: 0; }
+  .btn { padding: 8px 18px; }
+  .moment { padding: 20px 24px; border-inline-start-width: 4px; }
+  .slide--learn .list--row .list__item { padding-block: 16px; }
+  .closing { gap: 20px; max-width: none; }
+  .closing__rule { width: 72px; height: 2px; }
+  .closing__cta { padding: 10px 22px; }
+  .closing__mail { padding-bottom: 2px; }
+  .progress { height: 2px; }
+  .deck-bar { padding: 8px 20px; }
+  .nav__btn { padding: 6px 14px; }
+
+  /* إلغاء اللوح المقيس: الصفحة تملأ النافذة مباشرة */
+  html,
+  body {
+    position: static;
+    display: block;
+    overflow: hidden;
+  }
+
+  body {
+    height: 100vh;
+    height: 100dvh;
+    background: var(--paper);
+  }
+
+  .deck {
+    position: relative;
+    left: auto;
+    top: auto;
+    width: 100%;
+    height: 100%;
+    transform: none;
+  }
+
+  .deck-footer {
+    position: fixed;
+  }
+
+  .slide {
+    padding-bottom: calc(var(--slide-pad) + var(--bar-h));
+  }
+
+  .slide__inner {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .split,
+  .project,
+  .project--text-first {
+    grid-template-columns: minmax(0, 1fr);
+    /* الصف المقيّد بارتفاع اللوح ينهار حين تُكدَّس الأعمدة */
+    grid-template-rows: auto;
+    gap: var(--sp-4);
+    align-items: start;
+  }
+
+  /* ترتيب الأعمدة على اللوح لا ينطبق على عمود واحد */
+  .project--text-first .project__shot,
+  .project--text-first .project__body {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .lead {
+    max-width: none;
+  }
+
+  .list--row {
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
+
+  .project__shot {
+    align-items: center;
+    height: auto;
+  }
+
+  .project__shot img {
+    flex: none;
+    align-self: center;
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 30vh;
+    object-fit: contain;
+  }
+
+  .project__action {
+    margin-top: 0;
+  }
+
+  .facts {
+    justify-content: flex-start;
+    gap: var(--sp-4);
+  }
+
+  .deck-bar {
+    justify-content: center;
+    gap: var(--sp-5);
+  }
+}
+
+@media (max-width: 40rem) {
+  .split,
+  .project,
+  .project--text-first,
+  .moment__cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ---------------------------------------------------------
+   12) تفضيل تقليل الحركة
+--------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .showcase__strip {
+    animation: none;
+  }
+
+  .slide {
+    transition: none;
+    transform: none;
+  }
+
+  .btn:hover {
+    transform: none;
+  }
+}
+
+/* ---------------------------------------------------------
+   13) الطباعة / PDF — صفحة أفقية مستقلة لكل شريحة
+--------------------------------------------------------- */
+@page {
+  size: A4 landscape;
+  margin: 9mm;
+}
+
+@media print {
+  html {
+    /* في الطباعة يعود rem إلى وحدة ثابتة: 1rem = 10px،
+       فيصبح النص الأساسي 2.8rem = 28px تمامًا كما يشترط الدكتور */
+    font-size: 10px;
+  }
+
+  html,
+  body {
+    position: static;
+    display: block;
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+
+  body {
+    font-size: 28px;
+    line-height: 1.35;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .skip-link,
+  .deck-footer {
+    display: none !important;
+  }
+
+  /* في الطباعة يُلغى اللوح المقيس وتُطبع كل شريحة بخط 28px حقيقيًا */
+  .deck {
+    width: auto;
+    height: auto;
+    overflow: visible;
+    background: #fff;
+    transform: none;
+  }
+
+  .slide {
+    position: relative;
+    inset: auto;
+    display: flex;
+    flex-direction: column;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    transition: none;
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    height: auto;
+    min-height: 185mm;
+    max-height: 185mm;
+    padding: 6mm;
+    background: var(--paper);
+    overflow: hidden;
+  }
+
+  .slide:last-of-type {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .slide__inner {
+    max-width: none;
+    overflow: visible;
+  }
+
+  /* كل نص مرئي في الطباعة لا يقل عن 28px */
+  :root {
+    --fs-body: 28px;
+    --fs-h1: 44px;
+    --fs-h2: 36px;
+    --fs-h3: 28px;
+    --lh-body: 1.35;
+  }
+
+  .cover__title { font-size: 44px !important; }
+  .closing__thanks { font-size: 44px !important; }
+  .slide__head h2 { font-size: 36px !important; }
+  .moment__title { font-size: 30px !important; margin-bottom: var(--sp-3); }
+
+  .slide__head {
+    margin-bottom: var(--sp-3);
+  }
+
+  /* الغلاف */
+  .cover {
+    justify-content: center;
+    gap: var(--sp-5);
+  }
+
+  .cover__head {
+    max-width: none;
+  }
+
+  .showcase__strip {
+    animation: none !important;
+    transform: none !important;
+    gap: 10px;
+  }
+
+  .showcase__item[aria-hidden="true"] {
+    display: none;
+  }
+
+  .showcase__item img {
+    height: 26mm;
+  }
+
+  /* المشاريع: عمود واحد كامل العرض — صورة تطفو بجانب النص
+     حتى لا يتضيّق عمود النص فيفقد الشريحة ارتفاعها */
+  .project,
+  .project--text-first {
+    display: block;
+    position: relative;
+    grid-template-rows: none;
+    grid-template-columns: none;
+    padding-bottom: 40px;
+  }
+
+  .project--text-first .project__shot,
+  .project--text-first .project__body {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .project__body {
+    display: block;
+  }
+
+  .project__shot {
+    display: block;
+    float: inline-start;
+    width: 22rem;
+    height: auto;
+    margin: 0 16px 10px 0;
+  }
+
+  .project__shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: none;
+    flex: none;
+    box-shadow: none;
+  }
+
+  /* زر الزيارة ينزل إلى أسفل الشريحة بعرض كامل */
+  .project__action {
+    position: absolute;
+    bottom: 0;
+    inset-inline-start: 0;
+    width: 100%;
+    margin: 0;
+    padding-top: 0;
+  }
+
+  .facts {
+    display: block;
+    height: auto;
+    justify-content: flex-start;
+    gap: 0;
+    padding-bottom: 0;
+  }
+
+  .fact {
+    display: block;
+    margin-bottom: var(--sp-2);
+  }
+
+  .fact__label {
+    display: inline;
+    margin: 0;
+  }
+
+  .fact__label::after {
+    content: " — ";
+  }
+
+  .fact__text {
+    display: inline;
+  }
+
+  /* عنّي: عمود واحد */
+  .split,
+  .slide--about .split {
+    display: block;
+    grid-template-columns: none;
+    grid-template-rows: none;
+  }
+
+  .lead,
+  .slide--about .lead {
+    max-width: none;
+    margin-bottom: var(--sp-4);
+  }
+
+  .list--row,
+  .slide--about .list--row,
+  .slide--learn .list--row {
+    display: block;
+    flex: none;
+    align-items: stretch;
+  }
+
+  .list__item,
+  .slide--about .list__item,
+  .slide--learn .list--row .list__item {
+    display: block;
+    padding: var(--sp-3) 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: none;
+    align-content: initial;
+  }
+
+  .list__num,
+  .slide--about .list__num,
+  .slide--learn .list__num {
+    display: inline;
+  }
+
+  .list__title,
+  .slide--about .list__title {
+    display: inline;
+  }
+
+  .list__title::after {
+    content: " — ";
+  }
+
+  /* ماذا تعلمت؟: لوحة الموقف عمود واحد */
+  .slide--learn .moment {
+    display: block;
+    flex: none;
+    padding: var(--sp-4) var(--sp-5);
+  }
+
+  .moment__cols {
+    display: block;
+  }
+
+  .moment__col {
+    margin-bottom: var(--sp-2);
+  }
+
+  .moment__label {
+    display: inline;
+    margin: 0;
+  }
+
+  .moment__label::after {
+    content: " — ";
+  }
+
+  .moment__text {
+    display: inline;
+  }
+
+  /* الختام */
+  .closing__cta {
+    padding: 0.7rem 1.6rem;
+  }
+
+  .btn {
+    display: inline;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: none;
+    color: var(--olive-deep);
+    font-size: 28px;
+    font-weight: 600;
+  }
+
+  .btn__arrow {
+    font-size: 28px;
+  }
+
+  a {
+    text-decoration: none;
+  }
+}
